@@ -11,10 +11,10 @@ import (
 	"io"
 	"reflect"
 	"strconv"
-	"strings"
 
 	"cogentcore.org/core/base/reflectx"
 	"cogentcore.org/core/styles"
+	"cogentcore.org/core/svg"
 	"cogentcore.org/core/tree"
 )
 
@@ -45,6 +45,7 @@ var htmlElementNames = map[string]string{
 	"text-field": "input",
 	"spinner":    "input",
 	"slider":     "input",
+	"meter":      "progress",
 	"chooser":    "select",
 	"editor":     "textarea",
 	"pre":        "textarea",
@@ -68,17 +69,22 @@ func addAttr(se *xml.StartElement, name, value string) {
 func toHTML(w Widget, e *xml.Encoder, b *bytes.Buffer) error {
 	wb := w.AsWidget()
 	se := &xml.StartElement{}
-	idName := wb.NodeType().IDName
+	typ := wb.NodeType()
+	idName := typ.IDName
 	se.Name.Local = idName
 	if tag, ok := wb.Property("tag").(string); ok {
 		se.Name.Local = tag
+	}
+	if se.Name.Local == "tree" { // trees not supported yet
+		return nil
 	}
 	if en, ok := htmlElementNames[se.Name.Local]; ok {
 		se.Name.Local = en
 	}
 
-	if idName == "tree" {
-		return nil
+	switch typ.Name {
+	case "cogentcore.org/cogent/canvas.Canvas", "cogentcore.org/cogent/code.Code":
+		se.Name.Local = "div"
 	}
 	if se.Name.Local == "textarea" {
 		wb.Styles.Min.X.Pw(95)
@@ -86,7 +92,7 @@ func toHTML(w Widget, e *xml.Encoder, b *bytes.Buffer) error {
 
 	addAttr(se, "id", wb.Name)
 	if se.Name.Local != "img" { // images don't render yet
-		addAttr(se, "style", styles.ToCSS(&wb.Styles, idName))
+		addAttr(se, "style", styles.ToCSS(&wb.Styles, idName, se.Name.Local))
 	}
 
 	handleChildren := true
@@ -122,25 +128,33 @@ func toHTML(w Widget, e *xml.Encoder, b *bytes.Buffer) error {
 		return err
 	}
 
+	writeSVG := func(s *svg.SVG) error {
+		s.PhysicalWidth = wb.Styles.Min.X
+		s.PhysicalHeight = wb.Styles.Min.Y
+		sb := &bytes.Buffer{}
+		err := s.WriteXML(sb, false)
+		if err != nil {
+			return err
+		}
+		io.Copy(b, sb)
+		return nil
+	}
+
 	switch w := w.(type) {
 	case *Text:
 		// We don't want any escaping of HTML-formatted text, so we write directly.
 		b.WriteString(w.Text)
 	case *Icon:
-		si := string(w.Icon)
-		// Just use the default size from the element.
-		si = strings.ReplaceAll(si, `width="48"`, "")
-		si = strings.ReplaceAll(si, `height="48"`, "")
-		b.WriteString(si)
-	case *SVG:
-		w.SVG.PhysicalWidth = wb.Styles.Min.X
-		w.SVG.PhysicalHeight = wb.Styles.Min.Y
-		sb := &bytes.Buffer{}
-		err := w.SVG.WriteXML(sb, false)
+		w.Styles.Min.Zero() // do not specify any size for the inner svg object
+		err := writeSVG(&w.svg)
 		if err != nil {
 			return err
 		}
-		io.Copy(b, sb)
+	case *SVG:
+		err := writeSVG(w.SVG)
+		if err != nil {
+			return err
+		}
 	}
 	if se.Name.Local == "textarea" && idName == "editor" {
 		b.WriteString(reflectx.Underlying(reflect.ValueOf(w)).FieldByName("Buffer").Interface().(fmt.Stringer).String())

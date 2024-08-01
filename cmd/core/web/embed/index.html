@@ -4,12 +4,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="author" content="{{.Author}}">
-    <meta name="description" content="{{.Desc}}">
+    <meta name="description" content="{{.Description}}">
     <meta name="keywords" content="{{.Keywords}}">
     <meta name="viewport"
         content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0, viewport-fit=cover">
     <meta property="og:title" content="{{.Title}}">
-    <meta property="og:description" content="{{.Desc}}">
+    <meta property="og:description" content="{{.Description}}">
     <meta property="og:type" content="website">
     <meta property="og:image" content="{{.BasePath}}icons/512.png">
     <meta property="og:site_name" content="{{.SiteName}}">
@@ -39,7 +39,8 @@
             <p id="app-wasm-loader-label">0%</p>
             <progress id="app-wasm-loader-progress" value="0"></progress>
         </header>
-        <h1>Preview:</h1>
+        <h1>Loading...</h1>
+        <h3>Static preview:</h3>
         {{.PreRenderHTML}}
     </div>
 </body>
